@@ -6,7 +6,9 @@ const morgan = require('morgan')
 const connectDB = require('./config/db')
 const { connectRedis } = require('./config/redis')
 
+//Routes
 const authRoutes = require('./routes/authRoutes')
+const patientRoutes = require('./routes/patientRoutes')
 
 const errorHandler = require('./middlewares/errorHandler')
 
@@ -33,13 +35,15 @@ app.use((req, res, next) => {
 // Serve static uploaded files
 app.use('/uploads', express.static('uploads'))
 
-// Test route - quick sanity check
+// Test route
 app.get('/api/test', (req, res) => {
     res.json({ message: 'TEST API is working fine!' })
 })
 
-// Mount auth routes
+// Mount routes
 app.use('/api/auth', authRoutes)
+app.use('/api/patients', patientRoutes)
+
 
 // Error handling middleware - catches any thrown errors
 app.use(errorHandler)
