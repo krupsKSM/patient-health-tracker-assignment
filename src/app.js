@@ -1,39 +1,54 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
+const express = require('express')
+const cors = require('cors')
+const helmet = require('helmet')
+const morgan = require('morgan')
 
-const connectDB = require('./config/db');
-const { connectRedis } = require('./config/redis');
+const connectDB = require('./config/db')
+const { connectRedis } = require('./config/redis')
 
+const authRoutes = require('./routes/authRoutes')
 
-const app = express();
+const errorHandler = require('./middlewares/errorHandler')
 
-// Connect to databases
-connectDB();
-connectRedis();
+const app = express()
 
-// Middleware
-app.use(cors());
-app.use(helmet());
-app.use(morgan('dev'));
+// Connect databases
+connectDB()
+connectRedis()
 
-// Only parse JSON for mutations
+// Security and logging middleware
+app.use(cors())
+app.use(helmet())
+app.use(morgan('dev'))
+
+// Only parse JSON for request methods that likely have a body
 app.use((req, res, next) => {
-  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-    express.json()(req, res, next);
-  } else {
-    next();
-  }
-});
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        express.json()(req, res, next)
+        return
+    }
+    next()
+})
 
-// Serve uploaded files statically
-app.use('/uploads', express.static('uploads'));
+// Serve static uploaded files
+app.use('/uploads', express.static('uploads'))
 
-// Placeholder error handler 
-app.use((err, req, res, next) => {
-  console.error(err.stack || err.message);
-  res.status(err.statusCode || 500).json({ message: err.message || 'Server Error' });
-});
+// Test route - quick sanity check
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'TEST API is working fine!' })
+})
 
-module.exports = app;
+// Mount auth routes
+app.use('/api/auth', authRoutes)
+
+// Error handling middleware - catches any thrown errors
+app.use(errorHandler)
+
+
+// default fallback
+app.use((req, res) => {
+    res.status(404).json({ message: 'Route not found' })
+})
+
+
+module.exports = app
