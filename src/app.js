@@ -9,6 +9,7 @@ const { connectRedis } = require('./config/redis')
 //Routes
 const authRoutes = require('./routes/authRoutes')
 const patientRoutes = require('./routes/patientRoutes')
+const dashboardRoutes = require('./routes/dashboardRoutes')
 
 const errorHandler = require('./middlewares/errorHandler')
 
@@ -43,6 +44,7 @@ app.get('/api/test', (req, res) => {
 // Mount routes
 app.use('/api/auth', authRoutes)
 app.use('/api/patients', patientRoutes)
+app.use('/api/dashboard', dashboardRoutes)
 
 
 // Error handling middleware - catches any thrown errors
