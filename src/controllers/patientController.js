@@ -2,6 +2,8 @@ const path = require('path')
 const fs = require('fs')
 const { generateDummyPDF } = require('../services/pdfService')
 const Patient = require('../models/Patient')
+const { reportQueue } = require('../jobs/bullQueues')
+
 
 // Helper to build BMI filtering for aggregation pipeline
 function buildBMIFilter(minBMI, maxBMI) {
@@ -34,9 +36,16 @@ exports.createPatient = async (req, res, next) => {
     const patient = new Patient({
       name, age, height, weight, fatPercentage, profileImage, reportPDF,
       createdBy: req.user.id,
+      whatsappReportSent: false,  // Initial states, optional because default works too
+      crmSyncStatus: 'pending',
     })
 
     await patient.save()
+
+    // ENQUEUE background job for Whatsapp notification and CRM sync:
+    // pushes a job into the Bull queue, which job processor will pick up asynchronously
+    await reportQueue.add({ patient })
+
     res.status(201).json(patient)
   } catch (err) {
     next(err)

@@ -34,13 +34,23 @@ const patientSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User', required: true
     },
+    // NEW status fields for background jobs tracking
+    whatsappReportSent: {
+        type: Boolean,
+        default: false
+    },
+    crmSyncStatus: {
+        type: String,
+        enum: ['pending', 'success', 'fail'],
+        default: 'pending'
+    },
 }, { timestamps: true });
 
 // Virtual field for BMI (weight(kg) / height(m)^2)
 // Note: height stored in cm, convert to meters before calculation
 patientSchema.virtual('bmi').get(function () {
-  const heightMeters = this.height / 100
-  return this.weight / (heightMeters * heightMeters)
+    const heightMeters = this.height / 100
+    return this.weight / (heightMeters * heightMeters)
 })
 
 patientSchema.set('toJSON', { virtuals: true })
