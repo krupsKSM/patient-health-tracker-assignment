@@ -6,55 +6,58 @@ const morgan = require('morgan')
 const connectDB = require('./config/db')
 const { connectRedis } = require('./config/redis')
 
-//Routes
+// Import routes
 const authRoutes = require('./routes/authRoutes')
 const patientRoutes = require('./routes/patientRoutes')
 const dashboardRoutes = require('./routes/dashboardRoutes')
 
+// Import errorHandler middleware
 const errorHandler = require('./middlewares/errorHandler')
 
 const app = express()
 
-// Connect databases
+// Connect databases (MongoDB + Redis)
 connectDB()
 connectRedis()
 
-// Security and logging middleware
+// Import Bull queues
+const { reportQueue } = require('./jobs/bullQueues')
+
+// Initialize Bull queue listeners (starts processors)
+reportQueue.on('completed', (job) => {
+    console.log(`Bull Job completed: ${job.id}`)
+})
+reportQueue.on('failed', (job, err) => {
+    console.error(`Bull Job failed: ${job.id}, error:`, err)
+})
+
+// Middleware: security, logging, parsing
 app.use(cors())
 app.use(helmet())
 app.use(morgan('dev'))
 
-// Only parse JSON for request methods that likely have a body
-app.use((req, res, next) => {
-    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-        express.json()(req, res, next)
-        return
-    }
-    next()
-})
+app.use(express.json())
 
-// Serve static uploaded files
+
+// Serve uploaded files statically
 app.use('/uploads', express.static('uploads'))
 
-// Test route
+// Test route for sanity check
 app.get('/api/test', (req, res) => {
-    res.json({ message: 'TEST API is working fine!' })
+    res.json({ message: 'API is working fine!' })
 })
 
-// Mount routes
+// Register API routes
 app.use('/api/auth', authRoutes)
 app.use('/api/patients', patientRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 
-
-// Error handling middleware - catches any thrown errors
+// Centralized error handler must be last middleware
 app.use(errorHandler)
 
-
-// default fallback
+// Default 404 fallback route
 app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' })
 })
-
 
 module.exports = app

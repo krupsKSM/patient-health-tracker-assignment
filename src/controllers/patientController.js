@@ -16,35 +16,56 @@ function buildBMIFilter(minBMI, maxBMI) {
 exports.createPatient = async (req, res, next) => {
   try {
     const { name, age, height, weight, fatPercentage } = req.body
-    const profileImage = req.files?.profileImage?.[0]?.path
-    let reportPDF = req.files?.reportPDF?.[0]?.path
+
+    // Safely access uploaded file paths, if any
+    const profileImage = req.files?.profileImage?.[0]?.path || ''
+    let reportPDF = req.files?.reportPDF?.[0]?.path || ''
 
     if (!name || !age || !height || !weight || !fatPercentage) {
-      return res.status(400).json({ message: 'Please provide name, age, height, weight and fatPercentage.' })
+      return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    // Auto-generate PDF report if none uploaded
-    if (!reportPDF) {
-      const reportsDir = path.resolve('uploads/reports')
-      if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true })
+    if (typeof age !== 'number' || typeof height !== 'number' || typeof weight !== 'number' || typeof fatPercentage !== 'number') {
+      return res.status(400).json({ message: 'Age, height, weight, and fatPercentage must be numbers' });
+    }
 
-      const pdfPath = path.join(reportsDir, `report_${Date.now()}.pdf`)
-      await generateDummyPDF(name, pdfPath)
-      reportPDF = pdfPath
+    // Generate dummy PDF only if no report PDF uploaded
+    if (!reportPDF) {
+      const destPath = path.join('uploads', `${name}-${Date.now()}.pdf`);
+      try {
+        await generateDummyPDF(name, destPath);
+        reportPDF = destPath; // Set reportPDF to the generated path
+      } catch (error) {
+        console.error('Error generating dummy PDF:', error);
+        // Optionally, you might want to set a default value or handle the error differently
+      }
     }
 
     const patient = new Patient({
-      name, age, height, weight, fatPercentage, profileImage, reportPDF,
+      name,
+      age,
+      height,
+      weight,
+      fatPercentage,
+      profileImage,
+      reportPDF,
       createdBy: req.user.id,
-      whatsappReportSent: false,  // Initial states, optional because default works too
-      crmSyncStatus: 'pending',
-    })
+    });
 
-    await patient.save()
+    try {
+      await patient.save();
+      console.log('Patient saved successfully:', patient._id);
+    } catch (saveError) {
+      console.error('Error saving patient:', saveError);
+      return next(saveError);
+    }
 
-    // ENQUEUE background job for Whatsapp notification and CRM sync:
-    // pushes a job into the Bull queue, which job processor will pick up asynchronously
-    await reportQueue.add({ patient })
+    // Enqueue background job as usual
+    try {
+      await reportQueue.add({ patient });
+    } catch (queueError) {
+      console.error('Error adding job to queue:', queueError);
+    }
 
     res.status(201).json(patient)
   } catch (err) {
@@ -52,9 +73,24 @@ exports.createPatient = async (req, res, next) => {
   }
 }
 
+
 exports.getPatients = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, sortBy = 'age', order = 'asc', minBMI, maxBMI } = req.query
+    let { page = 1, limit = 10, sortBy = 'age', order = 'asc', minBMI, maxBMI } = req.query
+
+    page = Number(page);
+    limit = Number(limit);
+    minBMI = minBMI ? Number(minBMI) : undefined;
+    maxBMI = maxBMI ? Number(maxBMI) : undefined;
+
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1 || limit > 100) limit = 10; // Limit to a reasonable max
+    if (sortBy !== 'age' && sortBy !== 'bmi' && sortBy !== 'name') sortBy = 'age';
+    if (order !== 'asc' && order !== 'desc') order = 'asc';
+
+    if ((minBMI && isNaN(minBMI)) || (maxBMI && isNaN(maxBMI))) {
+      return res.status(400).json({ message: 'minBMI and maxBMI must be numbers' });
+    }
 
     const bmiFilter = buildBMIFilter(minBMI, maxBMI)
 

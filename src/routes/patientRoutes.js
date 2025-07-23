@@ -15,10 +15,23 @@ const storage = multer.diskStorage({
   },
 })
 
+// Create upload instance with storage configured
 const upload = multer({ storage })
 
+// Routes
 router.get('/', protect, patientController.getPatients)
 router.get('/:id', protect, patientController.getPatientById)
+
+// router.post(
+//   '/',
+//   protect,
+//   authorizeRoles('admin', 'coach'),
+//   upload.fields([
+//     { name: 'profileImage', maxCount: 1 },
+//     { name: 'reportPDF', maxCount: 1 },
+//   ]),
+//   patientController.createPatient,
+// )
 
 router.post(
   '/',
@@ -28,17 +41,17 @@ router.post(
     { name: 'profileImage', maxCount: 1 },
     { name: 'reportPDF', maxCount: 1 },
   ]),
-  patientController.createPatient,
+  patientController.createPatient
 )
 
 router.put(
   '/:id',
   protect,
   authorizeRoles('admin', 'coach'),
-  upload.fields([
-    { name: 'profileImage', maxCount: 1 },
-    { name: 'reportPDF', maxCount: 1 },
-  ]),
+//   upload.fields([
+//     { name: 'profileImage', maxCount: 1 },
+//     { name: 'reportPDF', maxCount: 1 },
+//   ]),
   patientController.updatePatient,
 )
 
